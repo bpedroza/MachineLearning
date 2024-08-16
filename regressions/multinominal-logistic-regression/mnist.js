@@ -2,23 +2,37 @@ const _ = require('lodash');
 const BatchLogisticRegressionTF = require('./BatchLogisticRegressionTF');
 const mnist = require('mnist-data');
 
-const mnistTrainingData = mnist.training(0, 2000);
-const mnistTestData = mnist.testing(0, 100)
 
-const features = mapFeatures(mnistTrainingData.images.values);
-const encodedLabels = encodeLabels(mnistTrainingData.labels.values);
-const testFeatures = mapFeatures(mnistTestData.images.values);
-const encodedTestLabels = encodeLabels(mnistTestData.labels.values);
+const batchSize = 500;
+const trainingDataSize = 60000;
+const testDataSize = 10000;
 
-const batchSize = 10;
-const regression = new BatchLogisticRegressionTF(batchSize, features, encodedLabels, {
-    learningRate: .1,
-    iterations: 15
-});
+const regression = new BatchLogisticRegressionTF(
+    batchSize, 
+    {
+        learningRate: 1,
+        iterations: 80
+    }
+);
 
-regression.train();
-console.log(regression.test(testFeatures, encodedTestLabels));
+regression.train(...trainingData());
+console.log(regression.test(...testData()));
 
+function trainingData() {
+    const mnistTrainingData = mnist.training(0, trainingDataSize);
+    return [
+        mapFeatures(mnistTrainingData.images.values),
+        encodeLabels(mnistTrainingData.labels.values)
+    ];
+}
+
+function testData() {
+    const mnistTestData = mnist.testing(0, testDataSize);
+    return [
+        mapFeatures(mnistTestData.images.values),
+        encodeLabels(mnistTestData.labels.values)
+    ];
+}
 
 function mapFeatures(features) {
     return features.map(image => _.flatMap(image));

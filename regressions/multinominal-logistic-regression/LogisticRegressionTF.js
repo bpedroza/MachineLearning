@@ -2,11 +2,7 @@ const tf = require('@tensorflow/tfjs-node');
 
 class LogisticRegressionTF {
 
-    constructor(features, labels, options) {
-        var numWeights = (features[0].length || 0) + 1;
-        this.weights = tf.zeros([numWeights, labels[0].length || 0]);
-        this.labels = tf.tensor(labels);
-        this.features = this.processFeatures(features);
+    constructor(options) {
         this.crossEntropy = null;
         this.lastCrossEntropy = null;
 
@@ -30,7 +26,7 @@ class LogisticRegressionTF {
         const differences = currentGuesses.sub(labels);
 
         const slopes = features.transpose().matMul(differences).div(features.shape[0]);
-        this.weights = this.weights.sub(slopes.mul(this.options.learningRate));
+        return this.weights.sub(slopes.mul(this.options.learningRate));
     }
 
     predict(observations) {
@@ -60,20 +56,22 @@ class LogisticRegressionTF {
         return features;
     }
 
-    recordCrossEntropy() {
-        const guesses = this.predictRaw(this.features);
+    recordCrossEntropy(features, labels) {
+        this.crossEntropy = tf.tidy(() => {
+            const guesses = this.predictRaw(features);
 
-        const firstTerm = this.labels.transpose().matMul(guesses.log());
-        const secondTerm = this.labels.mul(-1)
-            .add(1)
-            .transpose()
-            .matMul(guesses.mul(-1).add(1).log());
+            const firstTerm = labels.transpose().matMul(guesses.add(0.00000001).log());
+            const secondTerm = labels.mul(-1)
+                .add(1)
+                .transpose()
+                .matMul(guesses.mul(-1).add(1.00000001).log());
 
-        this.crossEntropy = firstTerm
-            .add(secondTerm)
-            .div(this.features.shape[0])
-            .mul(-1)
-            .arraySync();
+            return firstTerm
+                .add(secondTerm)
+                .div(features.shape[0])
+                .mul(-1)
+                .arraySync();
+        });
     }
 
     standardizeFeatureValues(features) {
@@ -100,13 +98,24 @@ class LogisticRegressionTF {
         return (predictions.shape[0] - incorrect) / predictions.shape[0];
     }
 
-    train() {
+    train(features, labels) {
+        this.setWeights(features, labels);
+        features = this.processFeatures(features);
+        labels = tf.tensor(labels);
         for (var i = 0; i < this.options.maxIterations; i++) {
-            this.gradientDescent(this.features, this.labels);
-            this.recordCrossEntropy();
+            this.weights = tf.tidy(() => {
+                return this.gradientDescent(features, labels);
+            });
+            
+            this.recordCrossEntropy(features, labels);
             this.updateLearningRate();
             this.lastCrossEntropy = this.crossEntropy;
         }
+    }
+
+    setWeights(features, labels) {
+        var numWeights = (features[0].length || 0) + 1;
+        this.weights = tf.zeros([numWeights, labels[0].length || 0]);
     }
 
     updateLearningRate() {

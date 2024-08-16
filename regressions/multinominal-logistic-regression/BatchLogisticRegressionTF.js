@@ -3,23 +3,28 @@ const LogisticRegressionTF = require('./LogisticRegressionTF');
 
 class BatchLogisticRegressionTF extends LogisticRegressionTF{
 
-    constructor(batchSize, features, labels, options) {
-        super(features, labels, options);
+    constructor(batchSize, options) {
+        super(options);
         this.batchSize = batchSize;
     }
 
-    train() {
-        const features = this.features;
+    train(features, labels) {
+        this.setWeights(features, labels);
+        features = this.processFeatures(features);
+        labels = tf.tensor(labels);
+
         const batchQuantity = Math.floor(features.shape[0] / this.batchSize);
         for (var i = 0; i < this.options.maxIterations; i++) {
             for (var j = 0; j < batchQuantity; j++) {
-                const startRow = j * this.batchSize;
-                const featureBatch = features.slice([startRow, 0], [this.batchSize, -1]);
-                const labelBatch = this.labels.slice([startRow, 0], [this.batchSize, -1]);
-                this.gradientDescent(featureBatch, labelBatch);
+                this.weights = tf.tidy(() => {
+                    const startRow = j * this.batchSize;
+                    const featureBatch = features.slice([startRow, 0], [this.batchSize, -1]);
+                    const labelBatch = labels.slice([startRow, 0], [this.batchSize, -1]);
+                    return this.gradientDescent(featureBatch, labelBatch);
+                });
             }
             
-            this.recordCrossEntropy();
+            this.recordCrossEntropy(features, labels);
             this.updateLearningRate();
             this.lastCrossEntropy = this.crossEntropy;
         }
